@@ -1,0 +1,35 @@
+{
+  "contract_name": "xAPIContract",
+  "abi": [
+    {
+      "constant": true,
+      "inputs": [],
+      "name": "LIQUIDITY_TOKEN",
+      "outputs": [
+        {
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "payable": false,
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [],
+      "name": "DEX_CONTRACT",
+      "outputs": [
+        {
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "payable": false,
+      "type": "function"
+    }
+  ],
+  "unlinked_binary": "0x6060604052341561000c57fe5b5b60c68061001b6000396000f300606060405263ffffffff60e060020a60003504166354d898728114602a578063a8cb3b6a146053575bfe5b3415603157fe5b6037607c565b60408051600160a060020a039092168252519081900360200190f35b3415605a57fe5b6037608b565b60408051600160a060020a039092168252519081900360200190f35b600154600160a060020a031681565b600054600160a060020a0316815600a165627a7a723058202ab070436ecbac358aff2f580b60740c3bf55b6cea24101a1b124a3b3c1168a20029",
+  "networks": {},
+  "schema_version": "0.0.5",
+  "updated_at": 1502699399981
+}

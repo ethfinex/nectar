@@ -1,0 +1,35 @@
+{
+  "contract_name": "RewardScheme",
+  "abi": [
+    {
+      "constant": true,
+      "inputs": [
+        {
+          "name": "_previousSupply",
+          "type": "uint256"
+        },
+        {
+          "name": "_initialSupply",
+          "type": "uint256"
+        },
+        {
+          "name": "_totalFees",
+          "type": "uint256"
+        }
+      ],
+      "name": "rewardRate",
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "payable": false,
+      "type": "function"
+    }
+  ],
+  "unlinked_binary": "0x6060604052341561000c57fe5b5b60d18061001b6000396000f300606060405263ffffffff60e060020a6000350416631444632481146020575bfe5b3415602757fe5b60366004356024356044356048565b60408051918252519081900360200190f35b60006066605a848463ffffffff607016565b859063ffffffff608916565b90505b9392505050565b600082820183811015607e57fe5b8091505b5092915050565b600060008284811515609757fe5b0490508091505b50929150505600a165627a7a723058208aa8074c6afc23b38eb0eee708fa648acad3c04ee31cbe99736846e71cad4c680029",
+  "networks": {},
+  "schema_version": "0.0.5",
+  "updated_at": 1502544849652
+}
