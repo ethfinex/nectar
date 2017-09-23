@@ -30,6 +30,7 @@ contract LiquidityToken is Whitelist, StandardToken, RewardScheme {
   event LogCreate (uint window, uint tokensGenerated);
   event LogClaim (uint window, address user, uint amount);
   event LogCollect (address owner, uint amount);
+  event UpgradedRewardMechanism (address newAddress);
 
   /// @dev Contract constructor function sets initial balance and starts the first window.
   /// @param _periodLength Time between each new window.
@@ -182,6 +183,13 @@ contract LiquidityToken is Whitelist, StandardToken, RewardScheme {
 
   address public rewardRateUpgradedAddress;
   bool public upgraded;
+
+  // Deprecate current reward mechanism in favour of a new one
+  function upgradeReward(address _upgradedAddress) onlyOwner {
+    upgraded = true;
+    rewardRateUpgradedAddress = _upgradedAddress;
+    UpgradedRewardMechanism(_upgradedAddress);
+  }
 
   /// @dev getCurrentRewardRate - Reward scheme equations are upgradeable so that issuance and minting may change in the future if required
   /// @param _previousSupply - Supply at the start of the window
