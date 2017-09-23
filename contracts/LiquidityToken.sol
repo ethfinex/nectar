@@ -51,9 +51,23 @@ contract LiquidityToken is Whitelist, StandardToken, RewardScheme {
   }
 
   /// Time based function to give the current operating token generation cycle
+  // function currentWindow() constant returns (uint) {
+  //     return windowFor(time());
+  // }
+
+//////// Testing ///////////////////////
+
+  uint testWindow = 1;
+
   function currentWindow() constant returns (uint) {
-      return windowFor(time());
+      return testWindow;
   }
+
+  function incrementTestWindow() {
+    testWindow++;
+  }
+
+///////////////////////////////////////
 
   function windowFor(uint timestamp) constant returns (uint) {
       return timestamp < startTime
@@ -88,7 +102,7 @@ contract LiquidityToken is Whitelist, StandardToken, RewardScheme {
 
   /// @dev claim - Claim tokens from specified window
   /// @param window - Select which cycle to claim tokens for
-  function claim(uint window) {
+  function claim(uint window) returns (bool) {
       assert(currentWindow() > window);
 
       // First time claim is called for the window, mint all new tokens and place into a holding basket
@@ -97,7 +111,7 @@ contract LiquidityToken is Whitelist, StandardToken, RewardScheme {
       }
 
       if (tokensClaimed[window][msg.sender] || feeContributions[window][msg.sender] == 0) {
-          return;
+          return false;
       }
 
       uint256 feesPaidAllTime = cumulativeFeesAtStartOfWindow[window];
@@ -112,6 +126,7 @@ contract LiquidityToken is Whitelist, StandardToken, RewardScheme {
       balances[0x0] = balances[0x0].sub(reward);
 
       LogClaim(window, msg.sender, reward);
+      return true;
   }
 
   /// @dev claimAll - Claim all tokens earned in windows so far - N.B. could get stuck as currentWindow becomes large

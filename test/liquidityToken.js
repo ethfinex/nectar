@@ -53,14 +53,17 @@ contract('LiquidityToken', function(accounts) {
   it("should update window total fees when a maker sends funds", function() {
     return LiquidityToken.deployed().then(function(instance) {
       liq = instance;
-      return liq.contribute(accounts[0], true, {from: accounts[0], value: web3.toWei(1, 'ether')});
+      return liq.contribute(accounts[1], true, {from: accounts[1], value: web3.toWei(1, 'ether')});
     }).then(function(response) {
       return liq.windowTotalFees(1);
     }).then(function(feesIn) {
       assert.equal(feesIn.valueOf(), web3.toWei(1, 'ether'), "Fee was not successfully contributed");
-      return liq.feeContributions(1, accounts[0]);
+      return liq.feeContributions(1, accounts[1]);
     }).then(function(makerContributed) {
       assert.equal(makerContributed.valueOf(), web3.toWei(1, 'ether'), "Fee was not attributed to the maker");
+      return liq.feeContributions(1, accounts[0]);
+    }).then(function(ownerContributed) {
+      assert.equal(ownerContributed.valueOf(), 0, "Nothing");
     });
   });
 
@@ -87,5 +90,34 @@ contract('LiquidityToken', function(accounts) {
     });
   });
 
+// These tests require currentWindow to be over written with a mockup version
+
+it("should move to the second window", function() {
+  return LiquidityToken.deployed().then(function(instance) {
+    liq = instance;
+    return liq.incrementTestWindow();
+  }).then(function(result) {
+    return liq.currentWindow();
+  }).then(function(window) {
+    assert.equal(window.valueOf(), 2, "Current window did not return 2");
+  });
+});
+
+it("user can now claim for first window and their tokens are minted", function() {
+  return LiquidityToken.deployed().then(function(instance) {
+    liq = instance;
+    return liq.claim(1, {from: accounts[1]});
+  }).then(function(result) {
+    return liq.balanceOf.call(accounts[0]);
+  }).then(function(balance) {
+    assert.equal(balance.valueOf(), 100000000000000000000000, "Owner balance incorrectly changed");
+    return liq.balanceOf.call(accounts[1]);
+  }).then(function(balance) {
+    assert.equal(balance.valueOf(), 1000000000000000000, "New token balance incorrect");
+    return liq.tokensClaimed.call(1,accounts[1]);
+  }).then(function(result) {
+    assert.equal(result, true);
+  });
+});
 
 });
