@@ -86,7 +86,7 @@ contract('LiquidityToken', function(accounts) {
       liq = instance;
       return liq.register([accounts[1], accounts[2], accounts[3]])
     }).then(function(response) {
-      assert(liq.isOnList(accounts[1]), true)
+      assert(liq.isOnList(accounts[3]), true)
     });
   });
 
@@ -119,5 +119,87 @@ it("user can now claim for first window and their tokens are minted", function()
     assert.equal(result, true);
   });
 });
+
+it("two more users can contribute during this window, one as a maker and one as a taker", function() {
+  return LiquidityToken.deployed().then(function(instance) {
+    liq = instance;
+    return liq.contribute(accounts[2], true, {from: accounts[0], value: web3.toWei(2, 'ether')});
+  }).then(function(result) {
+    return liq.contribute(accounts[3], false, {from: accounts[0], value: web3.toWei(4, 'ether')});
+  }).then(function(result) {
+    return liq.windowTotalFees(2);
+  }).then(function(feesIn) {
+    assert.equal(feesIn.valueOf(), web3.toWei(6, 'ether'), "Incorrect fee accounting");
+    return liq.feeContributions(2, accounts[2]);
+  }).then(function(contributed) {
+    assert.equal(contributed.valueOf(), web3.toWei(2, 'ether'), "Maker not correctly credited");
+    return liq.feeContributions(2, accounts[3]);
+  }).then(function(contributed) {
+    assert.equal(contributed.valueOf(), 0, "Taker incorrectly credited");
+  });
+});
+
+it("is possible to for owner to do a batch contribution of fees", function() {
+  return LiquidityToken.deployed().then(function(instance) {
+    liq = instance;
+    return liq.batchContribute([accounts[4],accounts[5],accounts[6]], [web3.toWei(1,'ether'),web3.toWei(2,'ether'),web3.toWei(3,'ether')], {from: accounts[0], value: web3.toWei(6, 'ether')});
+  }).then(function(result){
+    return liq.windowTotalFees(2);
+  }).then(function(feesIn) {
+    assert.equal(feesIn.valueOf(), web3.toWei(12, 'ether'), "Incorrect fee accounting");
+    return liq.feeContributions(2, accounts[4]);
+  }).then(function(contributed) {
+    assert.equal(contributed.valueOf(), web3.toWei(1, 'ether'), "Maker not correctly credited");
+    return liq.feeContributions(2, accounts[5]);
+  }).then(function(contributed) {
+    assert.equal(contributed.valueOf(), web3.toWei(2, 'ether'), "Maker not correctly credited");
+  })
+})
+
+it("should move to the third window", function() {
+  return LiquidityToken.deployed().then(function(instance) {
+    liq = instance;
+    return liq.incrementTestWindow();
+  }).then(function(result) {
+    return liq.currentWindow();
+  }).then(function(window) {
+    assert.equal(window.valueOf(), 3, "Current window did not return 3");
+  });
+});
+
+it("should be possible to mint all tokens from previous window and assign to 0x00", function() {
+  return LiquidityToken.deployed().then(function(instance) {
+    liq = instance;
+    return liq.initialSupply.call();
+  }).then(function(result) {
+    assert.equal(result.valueOf(), 100000000000000000000000, "Initial supply messed up");
+    return liq.cumulativeFeesAtStartOfWindow.call(2)
+  }).then(function(result) {
+    assert.equal(result.valueOf(), web3.toWei(1, 'ether'), "Total fees messed up");
+    return liq.totalSupplyAtStartOfWindow.call(2);
+  }).then(function(result) {
+    assert.equal(result.valueOf(), 100001000000000000000000, "Previous supply messed up");
+    return liq.balanceOf.call('0x0000000000000000000000000000000000000000');
+  }).then(function(result) {
+    assert.equal(result.valueOf(), 0, "There were already unclaimed tokens")
+    return liq.mintNewTokens(2);
+  }).then(function(response) {
+    return liq.balanceOf.call('0x0000000000000000000000000000000000000000')
+  }).then(function(minted) {
+    // calculate how many tokens we really think should be minted here
+    assert.equal(minted.valueOf(), 12000000000000000000, "Wrong value");
+  });
+});
+
+it("users can claim their minted tokens", function() {
+  return LiquidityToken.deployed().then(function(instance) {
+    liq = instance;
+    return liq.claim(2, {from: accounts[4]});
+  }).then(function(result) {
+    return liq.balanceOf.call(accounts[4]);
+  }).then(function(balance) {
+    assert.equal(balance.valueOf(), 1000000000000000000, "Token balance incorrectly changed");
+  });
+})
 
 });

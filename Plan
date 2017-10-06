@@ -1,0 +1,15 @@
+Nectar contract can be done mainly off chain - with just accounting done via submissions to the block chain.
+
+So ZRX fees paid. Event logs give all the trades that happen with Ethfinex as the counterparty.
+
+Take event logs of trades, and at the end of each period sum the makers volume, and fees paid. Submit their fees to the contract on their behalf to give them tokens.
+
+:D
+
+This is publicly verifiable by 3rd parties. Nobody can take their tokens from them once they are issued.
+
+Also *need* a mechanism so that if tokens are not claimed after 6 windows they revert to belonging to Ethfinex. 
+
+Simple but effective. 
+
+Therefore need to optimise everything for batch contributions with lowest gas fees.
