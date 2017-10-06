@@ -1,0 +1,66 @@
+pragma solidity ^0.4.11;
+
+
+import "./MiniMeToken.sol";
+
+/*
+    Copyright 2017, Will Harborne (Ethfinex)
+*/
+
+
+/// @title Whitelist contract - Only addresses which are registered as part of the market maker loyalty scheme can be whitelisted to earn and own Nectar tokens
+contract Whitelist is Controlled {
+
+  // Only users who are on the whitelist
+  modifier isWhitelisted () {
+    require(isOnList[msg.sender]);
+    _;
+  }
+
+  // Only authorised sources/contracts can contribute fees on behalf of makers to earn tokens
+  modifier authorised () {
+    require(isAuthorisedMaker[msg.sender]);
+    _;
+  }
+
+  // This is the whitelist of users who are registered to be able to own the tokens
+  mapping (address => bool) public isOnList;
+
+  // This is a more select list of a few contracts or addresses which can contribute fees on behalf of makers, to generate tokens
+  mapping (address => bool) public isAuthorisedMaker;
+
+
+  /// @dev register
+  /// @param newUsers - Array of users to add to the whitelist
+  function register(address[] newUsers) onlyController {
+    for (uint i = 0; i < newUsers.length; i++) {
+      isOnList[newUsers[i]] = true;
+    }
+  }
+
+  /// @dev deregister
+  /// @param bannedUsers - Array of users to remove from the whitelist
+  function deregister(address[] bannedUsers) onlyController {
+    for (uint i = 0; i < bannedUsers.length; i++) {
+      isOnList[bannedUsers[i]] = false;
+    }
+  }
+
+  /// @dev authoriseMaker
+  /// @param maker - Source to add to authorised contributors
+  function authoriseMaker(address maker) onlyController {
+      isAuthorisedMaker[maker] = true;
+      // Also add any authorised Maker to the whitelist
+      address[] memory makers = new address[](1);
+      makers[0] = maker;
+      register(makers);
+  }
+
+  /// @dev deauthoriseMaker
+  /// @param maker - Source to remove from authorised contributors
+  function deauthoriseMaker(address maker) onlyController {
+      isAuthorisedMaker[maker] = false;
+  }
+
+
+}
