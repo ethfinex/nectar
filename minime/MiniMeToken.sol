@@ -163,6 +163,8 @@ contract MiniMeToken is Controlled {
 // ERC20 Methods
 ///////////////////
 
+    uint constant MAX_UINT = 2**256 - 1;
+
     /// @notice Send `_amount` tokens to `_to` from `msg.sender`
     /// @param _to The address of the recipient
     /// @param _amount The amount of tokens to be transferred
@@ -190,7 +192,9 @@ contract MiniMeToken is Controlled {
 
             // The standard ERC 20 transferFrom functionality
             if (allowed[_from][msg.sender] < _amount) return false;
-            allowed[_from][msg.sender] -= _amount;
+            if (_allowance < MAX_UINT) {
+              allowed[_from][msg.sender] -= _amount;
+            }
         }
         return doTransfer(_from, _to, _amount);
     }
