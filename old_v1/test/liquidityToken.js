@@ -50,6 +50,15 @@ contract('LiquidityToken', function(accounts) {
     });
   });
 
+  it("should register a bunch of authorised token holders", function() {
+    return LiquidityToken.deployed().then(function(instance) {
+      liq = instance;
+      return liq.register([accounts[1], accounts[2], accounts[3]])
+    }).then(function(response) {
+      assert(liq.isOnList(accounts[3]), true)
+    });
+  });
+
   it("should update window total fees when a maker sends funds", function() {
     return LiquidityToken.deployed().then(function(instance) {
       liq = instance;
@@ -78,15 +87,6 @@ contract('LiquidityToken', function(accounts) {
         assert.isAbove((e+"").indexOf("invalid opcode"),-1,"exception not thrown")
       }
     }).then(function(response) {
-    });
-  });
-
-  it("should register a bunch of authorised market makers", function() {
-    return LiquidityToken.deployed().then(function(instance) {
-      liq = instance;
-      return liq.register([accounts[1], accounts[2], accounts[3]])
-    }).then(function(response) {
-      assert(liq.isOnList(accounts[3]), true)
     });
   });
 

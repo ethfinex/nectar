@@ -9,7 +9,8 @@ import "./MiniMeToken.sol";
 contract NEC is MiniMeToken {
 
   function NEC(
-    address _tokenFactory
+    address _tokenFactory,
+    address efxVaultWallet
   ) MiniMeToken(
     _tokenFactory,
     0x0,                    // no parent token
@@ -19,10 +20,9 @@ contract NEC is MiniMeToken {
     "NEC",                  // Symbol
     true                    // Enable transfers
     ) {
-        generateTokens(msg.sender, 100000000000000000000000);
+        generateTokens(efxVaultWallet, 100000000000000000000000);
         enableBurning(false);
     }
-
 
     // Flag that determines if the token can be burned for rewards or not
     bool public burningEnabled;

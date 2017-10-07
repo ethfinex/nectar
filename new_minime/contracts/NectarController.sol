@@ -2,6 +2,7 @@ pragma solidity ^0.4.11;
 
 import "./MiniMeToken.sol";
 import "./WhiteList.sol";
+import "./SafeMath.sol";
 
 /*
     Copyright 2017, Will Harborne (Ethfinex)
@@ -13,8 +14,8 @@ contract NectarController is TokenController, Whitelist {
     MiniMeToken public tokenContract;   // The new token for this Campaign
     address public vaultAddress;        // The address to hold the funds donated
 
-    uint256 public periodLength;        // Contribution windows
-    uint256 public startTime;           // Time of window 1 opening
+    uint public periodLength = 7;       // Contribution windows length in days
+    uint public startTime;              // Time of window 1 opening
 
     mapping (uint => uint) public windowFinalBlock;  // Final block before initialisation of new window
 
