@@ -1,7 +1,7 @@
 pragma solidity ^0.4.11;
 
 
-import "./MiniMeToken.sol";
+import "./Owned.sol";
 
 /*
     Copyright 2017, Will Harborne (Ethfinex)
@@ -9,7 +9,7 @@ import "./MiniMeToken.sol";
 
 
 /// @title Whitelist contract - Only addresses which are registered as part of the market maker loyalty scheme can be whitelisted to earn and own Nectar tokens
-contract Whitelist is Controlled {
+contract Whitelist is Owned {
 
   // Only users who are on the whitelist
   modifier isWhitelisted () {
@@ -32,7 +32,7 @@ contract Whitelist is Controlled {
 
   /// @dev register
   /// @param newUsers - Array of users to add to the whitelist
-  function register(address[] newUsers) onlyController {
+  function register(address[] newUsers) onlyOwner {
     for (uint i = 0; i < newUsers.length; i++) {
       isOnList[newUsers[i]] = true;
     }
@@ -40,7 +40,7 @@ contract Whitelist is Controlled {
 
   /// @dev deregister
   /// @param bannedUsers - Array of users to remove from the whitelist
-  function deregister(address[] bannedUsers) onlyController {
+  function deregister(address[] bannedUsers) onlyOwner {
     for (uint i = 0; i < bannedUsers.length; i++) {
       isOnList[bannedUsers[i]] = false;
     }
@@ -48,7 +48,7 @@ contract Whitelist is Controlled {
 
   /// @dev authoriseMaker
   /// @param maker - Source to add to authorised contributors
-  function authoriseMaker(address maker) onlyController {
+  function authoriseMaker(address maker) onlyOwner {
       isAuthorisedMaker[maker] = true;
       // Also add any authorised Maker to the whitelist
       address[] memory makers = new address[](1);
@@ -58,7 +58,7 @@ contract Whitelist is Controlled {
 
   /// @dev deauthoriseMaker
   /// @param maker - Source to remove from authorised contributors
-  function deauthoriseMaker(address maker) onlyController {
+  function deauthoriseMaker(address maker) onlyOwner {
       isAuthorisedMaker[maker] = false;
   }
 

@@ -18,5 +18,38 @@ contract NEC is MiniMeToken {
     18,                     // Decimals
     "NEC",                  // Symbol
     true                    // Enable transfers
-    ) {}
+    ) {
+        generateTokens(msg.sender, 100000000000000000000000);
+        enableBurning(false);
+    }
+
+
+    // Flag that determines if the token can be burned for rewards or not
+    bool public burningEnabled;
+
+
+////////////////
+// Enable token burning by users
+////////////////
+
+    function enableBurning(bool _burningEnabled) onlyController {
+        burningEnabled = _burningEnabled;
+    }
+
+    function burnAndRetrieve(uint256 _amount) returns (bool success) {
+        require(burningEnabled);
+
+        // Alerts the token controller of the burn function call
+        // If enabled, controller will distribute fees and destroy tokens
+        // Or any other logic chosen by controller
+        if (isContract(controller)) {
+            require(TokenController(controller).onBurn(msg.sender, _amount));
+        }
+
+        Burned(msg.sender, _amount);
+        return true;
+    }
+
+    event Burned(address indexed who, uint256 _amount);
+
 }

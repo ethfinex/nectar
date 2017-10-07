@@ -2,26 +2,24 @@ pragma solidity ^0.4.11;
 
 import "./MiniMeToken.sol";
 import "./WhiteList.sol";
-import "./Owned.sol";
 
 /*
     Copyright 2017, Will Harborne (Ethfinex)
 */
 
-contract NectarController is TokenController, Owned {
+contract NectarController is TokenController, Whitelist {
+    using SafeMath for uint256;
 
-    uint public totalPledged;           // In wei
     MiniMeToken public tokenContract;   // The new token for this Campaign
     address public vaultAddress;        // The address to hold the funds donated
 
+    uint256 public periodLength;        // Contribution windows
+    uint256 public startTime;           // Time of window 1 opening
+
+    mapping (uint => uint) public windowFinalBlock;  // Final block before initialisation of new window
+
 
 /// @dev There are several checks to make sure the parameters are acceptable
-/// @param _startFundingTime The UNIX time that the Campaign will be able to
-/// start receiving funds
-/// @param _endFundingTime The UNIX time that the Campaign will stop being able
-/// to receive funds
-/// @param _maximumFunding In wei, the Maximum amount that the Campaign can
-/// receive (currently the max is set at 10,000 ETH for the beta)
 /// @param _vaultAddress The address that will store the donated funds
 /// @param _tokenAddress Address of the token contract this contract controls
 
@@ -29,14 +27,12 @@ contract NectarController is TokenController, Owned {
         address _vaultAddress,
         address _tokenAddress
     ) {
-            (_vaultAddress != 0));                    // To prevent burning ETH
-        tokenContract = MiniMeToken(_tokenAddress);// The Deployed Token Contract
+        require(_vaultAddress != 0);                // To prevent burning ETH
+        tokenContract = MiniMeToken(_tokenAddress); // The Deployed Token Contract
         vaultAddress = _vaultAddress;
+        startTime = block.timestamp;
+        windowFinalBlock[0] = block.number-1;
     }
-
-    // After this controller becomes owner of the NEC token contract
-    // Need to initialise the starting supply, and then start the first window
-    // Check it can only be called once
 
 /// @dev The fallback function is called when ether is sent to the contract, it
 /// simply calls `doPayment()` with the address that sent the ether as the
@@ -44,7 +40,11 @@ contract NectarController is TokenController, Owned {
 /// ether, without this modifier functions will throw if ether is sent to them
 
     function ()  payable {
-        doPayment(msg.sender);
+        doTakerPayment();
+    }
+
+    function contributeForMakers(address _owner) payable authorised {
+        doMakerPayment(_owner);
     }
 
 /////////////////
@@ -56,7 +56,7 @@ contract NectarController is TokenController, Owned {
 /// @param _owner The address that will hold the newly created tokens
 
     function proxyPayment(address _owner) payable returns(bool) {
-        doPayment(_owner);
+        doTakerPayment();
         return true;
     }
 
@@ -90,22 +90,46 @@ contract NectarController is TokenController, Owned {
         }
     }
 
+/// @notice Notifies the controller about a burn attempt. Currently all burns are disabled.
+/// Upgraded Controllers in the future will allow token holders to claim the pledged ETH
+/// @param _owner The address that calls `burn()`
+/// @param _amount The amount in the `burn()` call
+/// @return False if the controller does not authorize the approval
+    function onBurn(address _owner, uint _amount)
+        returns(bool)
+    {
+        // In future version of controller, this will pay out rewards from vault,
+        // destroy owner's tokens, and return true
+        // Currently burning is not possible
+        return false;
+    }
 
-/// @dev `doPayment()` is an internal function that sends the ether that this
+
+/// @dev `doMakerPayment()` is an internal function that sends the ether that this
 ///  contract receives to the `vault` and creates tokens in the address of the
-///  `_owner` assuming the Campaign is still accepting funds
+///  `_owner`who the fee contribution was sent by
 /// @param _owner The address that will hold the newly created tokens
 
-    function doPayment(address _owner) internal {
+    function doMakerPayment(address _owner) internal {
 
         require ((tokenContract.controller() != 0) && (msg.value != 0) );
-        totalPledged += msg.value;
+        tokenContract.pledgeFees(msg.value);
         require (vaultAddress.send(msg.value));
-        // How many tokens should be generated, comes down to the reward function
-        require (tokenContract.generateTokens(_owner, msg.value));
+        uint256 newIssuance = getFeeToTokenConversion(msg.value);
+        require (tokenContract.generateTokens(_owner, newIssuance));
         return;
     }
 
+/// @dev `doTakerPayment()` is an internal function that sends the ether that this
+///  contract receives to the `vault`
+
+    function doTakerPayment() internal {
+
+        require ((tokenContract.controller() != 0) && (msg.value != 0) );
+        tokenContract.pledgeFees(msg.value);
+        require (vaultAddress.send(msg.value));
+        return;
+    }
 
 /// @notice `onlyOwner` changes the location that ether is sent
 /// @param _newVaultAddress The address that will store the fees collected
@@ -113,23 +137,40 @@ contract NectarController is TokenController, Owned {
         vaultAddress = _newVaultAddress;
     }
 
-/// @dev getCurrentRewardRate - Reward scheme equations are upgradeable so that issuance and minting may change in the future if required
-/// @param _previousSupply - Supply at the start of the window
-/// @param _initialSupply - Supply at contract deployment
-/// @param _totalFees - Total fees held in the contract at the start of the window
-    function getCurrentRewardRate(uint256 _previousSupply, uint256 _initialSupply, uint256 _totalFees, uint256 _windowFees) constant returns (uint256){
-      if (upgraded) {
-        return RewardScheme(rewardRateUpgradedAddress).rewardRate(_previousSupply, _initialSupply, _totalFees, _windowFees);
-      } else {
-        return rewardRate(_previousSupply, _initialSupply, _totalFees, _windowFees);
-      }
+/// @notice `onlyOwner` can upgrade the controller contract
+/// @param _newControllerAddress The address that will have the token control logic
+    function upgradeController(address _newControllerAddress) onlyOwner {
+        tokenContract.changeController(_newControllerAddress);
     }
 
-/// Burn function which is disabled
-can be called, calls destroy token on behalf of caller (except disabled)
-then pays them out from pot of eth held by the controller
-except that is zero in this, because all sent to vault
-have a function to enable the burning and add some of the pledged eth back?
-onlyOwner can enable it
+/////////////////
+// Issuance reward related functions - upgraded by changing controller
+/////////////////
+
+/// @dev getFeeToTokenConversion - Controller could be changed in the future to update this function
+/// @param _contributed - The value of fees contributed during the window
+    function getFeeToTokenConversion(uint256 _contributed) constant returns (uint256){
+        // Set the block number which will be used to calculate issuance rate during
+        // this 28 day window if it has not already been set
+        if(windowFinalBlock[currentWindow()-1] == 0) {
+            windowFinalBlock[currentWindow()-1] == block.number -1;
+        }
+
+        uint calculationBlock = windowFinalBlock[currentWindow()-1];
+        uint256 previousSupply = tokenContract.totalSupplyAt(calculationBlock);
+        uint256 initialSupply = tokenContract.totalSupplyAt(windowFinalBlock[0]);
+        uint256 feeTotal = tokenContract.totalPledgedFeesAt(calculationBlock);
+        return _contributed.mul(previousSupply.div(initialSupply.add(feeTotal)));
+    }
+
+    function currentWindow() constant returns (uint) {
+       return windowAt(block.timestamp);
+    }
+
+    function windowAt(uint timestamp) constant returns (uint) {
+      return timestamp < startTime
+          ? 0
+          : timestamp.sub(startTime).div(periodLength * 1 days) + 1;
+    }
 
 }
