@@ -150,7 +150,7 @@ contract NectarController is TokenController, Whitelist {
 
 /// @dev getFeeToTokenConversion - Controller could be changed in the future to update this function
 /// @param _contributed - The value of fees contributed during the window
-    function getFeeToTokenConversion(uint256 _contributed) constant returns (uint256){
+    function getFeeToTokenConversion(uint256 _contributed) returns (uint256){
         // Set the block number which will be used to calculate issuance rate during
         // this 28 day window if it has not already been set
         if(windowFinalBlock[currentWindow()-1] == 0) {
