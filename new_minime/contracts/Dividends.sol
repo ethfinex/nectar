@@ -18,7 +18,7 @@ contract MiniMeToken {
 
 contract Owned {
     /// Allows only the owner to call a function
-    modifier onlyOwner { if (msg.sender != owner) throw; _; }
+    modifier onlyOwner { require(msg.sender == owner); _; }
 
     address public owner;
 
@@ -51,7 +51,7 @@ contract RewardContract is Owned {
 
     function newPayment() onlyOwner payable returns(bool) {
         if (msg.value == 0) return false;
-        Payment payment = payments[payments.length ++];
+        Payment storage payment = payments[payments.length ++];
         payment.block = block.number;
         payment.amount = msg.value;
         return true;
@@ -65,7 +65,7 @@ contract RewardContract is Owned {
             g:= gas
         }
         while (( i< payments.length) && ( g > 50000)) {
-            Payment payment = payments[i];
+            Payment storage payment = payments[i];
             acc +=  payment.amount *
                     token.balanceOfAt(msg.sender, payment.block) /
                         token.totalSupplyAt(payment.block);
@@ -75,13 +75,13 @@ contract RewardContract is Owned {
             }
         }
         nextRefundToPay[msg.sender] = i;
-        if (!msg.sender.send(acc)) throw;
+        require(msg.sender.send(acc));
     }
 
     function getPendingReward(address _holder) constant returns(uint) {
         uint acc =0;
         for (uint i=nextRefundToPay[msg.sender]; i<payments.length; i++) {
-            Payment payment = payments[i];
+            Payment storage payment = payments[i];
             acc +=  payment.amount *
                     token.balanceOfAt(msg.sender, payment.block) /
                         token.totalSupplyAt(payment.block);

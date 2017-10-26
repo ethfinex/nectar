@@ -62,5 +62,15 @@ contract Whitelist is Owned {
       isAuthorisedMaker[maker] = false;
   }
 
+  /////// Getters to allow the same whitelist to be used also by other contracts (including upgraded Controllers) ///////
+
+  function getRegistrationStatus(address _user) external returns (bool) {
+    return isOnList[_user];
+  }
+
+  function getAuthorisationStatus(address _maker) external returns (bool) {
+    return isAuthorisedMaker[_maker];
+  }
+
 
 }
