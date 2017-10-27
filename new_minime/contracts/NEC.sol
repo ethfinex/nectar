@@ -36,17 +36,22 @@ contract NEC is MiniMeToken {
         burningEnabled = _burningEnabled;
     }
 
-    function burnAndRetrieve(uint256 _amount) returns (bool success) {
+    function burnAndRetrieve(uint256 _tokensToBurn) returns (bool success) {
         require(burningEnabled);
+
+        var previousBalanceFrom = balanceOfAt(msg.sender, block.number);
+        if (previousBalanceFrom < _tokensToBurn) {
+            return false;
+        }
 
         // Alerts the token controller of the burn function call
         // If enabled, controller will distribute fees and destroy tokens
         // Or any other logic chosen by controller
         if (isContract(controller)) {
-            require(TokenController(controller).onBurn(msg.sender, _amount));
+            require(TokenController(controller).onBurn(msg.sender, _tokensToBurn));
         }
 
-        Burned(msg.sender, _amount);
+        Burned(msg.sender, _tokensToBurn);
         return true;
     }
 

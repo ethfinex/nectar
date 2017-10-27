@@ -420,7 +420,7 @@ contract MiniMeToken is Controlled {
    }
 
 ////////////////
-// Pledge Fees To Token Holders // in wei
+// Pledge Fees To Token Holders or Reduce Pledged Fees // in wei
 ////////////////
 
    /// @notice Pledges fees to the token holders, later to be claimed by burning
@@ -429,6 +429,15 @@ contract MiniMeToken is Controlled {
        uint curTotalFees = totalPledgedFees();
        require(curTotalFees + _value >= curTotalFees); // Check for overflow
        updateValueAtNow(totalPledgedFeesHistory, curTotalFees + _value);
+       return true;
+   }
+
+   /// @notice Reduces pledged fees to the token holders, i.e. during upgrade or token burning
+   /// @param _value The amount of pledged fees which are being distributed to token holders, reducing liability
+   function reducePledgedFees(uint _value) onlyController returns (bool) {
+       uint curTotalFees = totalPledgedFees();
+       require(curTotalFees >= _value);
+       updateValueAtNow(totalPledgedFeesHistory, curTotalFees - _value);
        return true;
    }
 

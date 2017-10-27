@@ -20,9 +20,9 @@ contract NectarController is TokenController, Whitelist {
     mapping (uint => uint) public windowFinalBlock;  // Final block before initialisation of new window
 
 
-/// @dev There are several checks to make sure the parameters are acceptable
-/// @param _vaultAddress The address that will store the donated funds
-/// @param _tokenAddress Address of the token contract this contract controls
+    /// @dev There are several checks to make sure the parameters are acceptable
+    /// @param _vaultAddress The address that will store the donated funds
+    /// @param _tokenAddress Address of the token contract this contract controls
 
     function NectarController(
         address _vaultAddress,
@@ -35,10 +35,10 @@ contract NectarController is TokenController, Whitelist {
         windowFinalBlock[0] = block.number-1;
     }
 
-/// @dev The fallback function is called when ether is sent to the contract, it
-/// simply calls `doPayment()` with the address that sent the ether as the
-/// `_owner`. Payable is a required solidity modifier for functions to receive
-/// ether, without this modifier functions will throw if ether is sent to them
+    /// @dev The fallback function is called when ether is sent to the contract, it
+    /// simply calls `doPayment()` with the address that sent the ether as the
+    /// `_owner`. Payable is a required solidity modifier for functions to receive
+    /// ether, without this modifier functions will throw if ether is sent to them
 
     function ()  payable {
         doTakerPayment();
@@ -52,21 +52,20 @@ contract NectarController is TokenController, Whitelist {
 // TokenController interface
 /////////////////
 
-/// @notice `proxyPayment()` allows the caller to send ether to the Campaign and
-/// have the tokens created in an address of their choosing
-/// @param _owner The address that will hold the newly created tokens
-
+    /// @notice `proxyPayment()` allows the caller to send ether to the Campaign and
+    /// have the tokens created in an address of their choosing
+    /// @param _owner The address that will hold the newly created tokens
     function proxyPayment(address _owner) payable returns(bool) {
         doTakerPayment();
         return true;
     }
 
-/// @notice Notifies the controller about a transfer.
-/// Transfers can only happen to whitelisted addresses
-/// @param _from The origin of the transfer
-/// @param _to The destination of the transfer
-/// @param _amount The amount of the transfer
-/// @return False if the controller does not authorize the transfer
+    /// @notice Notifies the controller about a transfer.
+    /// Transfers can only happen to whitelisted addresses
+    /// @param _from The origin of the transfer
+    /// @param _to The destination of the transfer
+    /// @param _amount The amount of the transfer
+    /// @return False if the controller does not authorize the transfer
     function onTransfer(address _from, address _to, uint _amount) returns(bool) {
         if (isOnList[_to] && isOnList[_from]) {
           return true;
@@ -75,12 +74,12 @@ contract NectarController is TokenController, Whitelist {
         }
     }
 
-/// @notice Notifies the controller about an approval, for this Campaign all
-///  approvals are allowed by default and no extra notifications are needed
-/// @param _owner The address that calls `approve()`
-/// @param _spender The spender in the `approve()` call
-/// @param _amount The amount in the `approve()` call
-/// @return False if the controller does not authorize the approval
+    /// @notice Notifies the controller about an approval, for this Campaign all
+    ///  approvals are allowed by default and no extra notifications are needed
+    /// @param _owner The address that calls `approve()`
+    /// @param _spender The spender in the `approve()` call
+    /// @param _amount The amount in the `approve()` call
+    /// @return False if the controller does not authorize the approval
     function onApprove(address _owner, address _spender, uint _amount)
         returns(bool)
     {
@@ -91,26 +90,35 @@ contract NectarController is TokenController, Whitelist {
         }
     }
 
-/// @notice Notifies the controller about a burn attempt. Currently all burns are disabled.
-/// Upgraded Controllers in the future will allow token holders to claim the pledged ETH
-/// @param _owner The address that calls `burn()`
-/// @param _amount The amount in the `burn()` call
-/// @return False if the controller does not authorize the approval
-    function onBurn(address _owner, uint _amount)
+    /// @notice Notifies the controller about a burn attempt. Initially all burns are disabled.
+    /// Upgraded Controllers in the future will allow token holders to claim the pledged ETH
+    /// @param _owner The address that calls `burn()`
+    /// @param _tokensToBurn The amount in the `burn()` call
+    /// @return False if the controller does not authorize the approval
+    function onBurn(address _owner, uint _tokensToBurn)
         returns(bool)
     {
-        // In future version of controller, this will pay out rewards from vault,
-        // destroy owner's tokens, and return true
-        // Currently burning is not possible
-        return false;
+        // This plugin can only be called by the token contract
+        require(msg.sender == address(tokenContract));
+
+        uint256 feeTotal = tokenContract.totalPledgedFees();
+        uint256 totalTokens = tokenContract.totalSupply();
+        uint256 feeValueOfTokens = feeTotal * (_tokensToBurn/totalTokens);
+
+        // Destroy the owners tokens prior to sending them the associated fees
+        require (tokenContract.destroyTokens(_owner, _tokensToBurn));
+        require (this.balance >= feeValueOfTokens);
+        require (_owner.send(feeValueOfTokens));
+
+        LogClaim(_owner, feeValueOfTokens);
+        return true;
     }
 
 
-/// @dev `doMakerPayment()` is an internal function that sends the ether that this
-///  contract receives to the `vault` and creates tokens in the address of the
-///  `_owner`who the fee contribution was sent by
-/// @param _owner The address that will hold the newly created tokens
-
+    /// @dev `doMakerPayment()` is an internal function that sends the ether that this
+    ///  contract receives to the `vault` and creates tokens in the address of the
+    ///  `_owner`who the fee contribution was sent by
+    /// @param _owner The address that will hold the newly created tokens
     function doMakerPayment(address _owner) internal {
 
         require ((tokenContract.controller() != 0) && (msg.value != 0) );
@@ -118,39 +126,43 @@ contract NectarController is TokenController, Whitelist {
         require (vaultAddress.send(msg.value));
         uint256 newIssuance = getFeeToTokenConversion(msg.value);
         require (tokenContract.generateTokens(_owner, newIssuance));
+
+        LogContributions (_owner, msg.value, true);
         return;
     }
 
-/// @dev `doTakerPayment()` is an internal function that sends the ether that this
-///  contract receives to the `vault`
-
+    /// @dev `doTakerPayment()` is an internal function that sends the ether that this
+    ///  contract receives to the `vault`
     function doTakerPayment() internal {
 
         require ((tokenContract.controller() != 0) && (msg.value != 0) );
         tokenContract.pledgeFees(msg.value);
         require (vaultAddress.send(msg.value));
+
+        LogContributions (msg.sender, msg.value, false);
         return;
     }
 
-/// @notice `onlyOwner` changes the location that ether is sent
-/// @param _newVaultAddress The address that will store the fees collected
+    /// @notice `onlyOwner` changes the location that ether is sent
+    /// @param _newVaultAddress The address that will store the fees collected
     function setVault(address _newVaultAddress) onlyOwner {
         vaultAddress = _newVaultAddress;
     }
 
-/// @notice `onlyOwner` can upgrade the controller contract
-/// @param _newControllerAddress The address that will have the token control logic
+    /// @notice `onlyOwner` can upgrade the controller contract
+    /// @param _newControllerAddress The address that will have the token control logic
     function upgradeController(address _newControllerAddress) onlyOwner {
         tokenContract.changeController(_newControllerAddress);
+        UpgradedController(_newControllerAddress);
     }
 
 /////////////////
 // Issuance reward related functions - upgraded by changing controller
 /////////////////
 
-/// @dev getFeeToTokenConversion - Controller could be changed in the future to update this function
-/// @param _contributed - The value of fees contributed during the window
-    function getFeeToTokenConversion(uint256 _contributed) returns (uint256){
+    /// @dev getFeeToTokenConversion - Controller could be changed in the future to update this function
+    /// @param _contributed - The value of fees contributed during the window
+    function getFeeToTokenConversion(uint256 _contributed) returns (uint256) {
         // Set the block number which will be used to calculate issuance rate during
         // this 28 day window if it has not already been set
         if(windowFinalBlock[currentWindow()-1] == 0) {
@@ -161,7 +173,8 @@ contract NectarController is TokenController, Whitelist {
         uint256 previousSupply = tokenContract.totalSupplyAt(calculationBlock);
         uint256 initialSupply = tokenContract.totalSupplyAt(windowFinalBlock[0]);
         uint256 feeTotal = tokenContract.totalPledgedFeesAt(calculationBlock);
-        return _contributed.mul(previousSupply.div(initialSupply.add(feeTotal)));
+        uint256 newTokens = _contributed.mul(previousSupply.div(initialSupply.add(feeTotal)));
+        return newTokens;
     }
 
     function currentWindow() constant returns (uint) {
@@ -173,5 +186,51 @@ contract NectarController is TokenController, Whitelist {
           ? 0
           : timestamp.sub(startTime).div(periodLength * 1 days) + 1;
     }
+
+    /// @dev topUpBalance - This is only used to increase this.balance in the case this controller is used to allow burning
+    function topUpBalance() payable {
+        // Pledged fees could be sent here and used to payout users who burn their tokens
+        LogFeeTopUp(msg.value);
+    }
+
+    /// @dev evacuateToVault - This is only used to increase this.balance in the case this controller is used to allow burning
+    function evacuateToVault() onlyOwner{
+        vaultAddress.transfer(this.balance);
+        LogFeeEvacuation(this.balance);
+    }
+
+
+//////////
+// Safety Methods
+//////////
+
+    /// @notice This method can be used by the owner to extract mistakenly
+    ///  sent tokens to this contract.
+    /// @param _token The address of the token contract that you want to recover
+    ///  set to 0 in case you want to extract ether.
+    function claimTokens(address _token) onlyOwner {
+        if (_token == 0x0) {
+            owner.transfer(this.balance);
+            return;
+        }
+
+        MiniMeToken token = MiniMeToken(_token);
+        uint balance = token.balanceOf(this);
+        token.transfer(owner, balance);
+        ClaimedTokens(_token, owner, balance);
+    }
+
+////////////////
+// Events
+////////////////
+    event ClaimedTokens(address indexed _token, address indexed _controller, uint _amount);
+
+    event LogFeeTopUp(uint _amount);
+    event LogFeeEvacuation(uint _amount);
+    event LogContributions (address _user, uint _amount, bool _maker);
+    event LogClaim (address _user, uint _amount);
+
+    event UpgradedController (address newAddress);
+
 
 }

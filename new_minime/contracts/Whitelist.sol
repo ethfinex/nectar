@@ -72,5 +72,9 @@ contract Whitelist is Owned {
     return isAuthorisedMaker[_maker];
   }
 
+  function getOwner() external returns (address) {
+    return owner;
+  }
+
 
 }
