@@ -1,6 +1,6 @@
 pragma solidity ^0.4.11;
 
-import "./MiniMeToken.sol";
+import "./NEC.sol";
 import "./WhiteList.sol";
 import "./SafeMath.sol";
 
@@ -11,7 +11,7 @@ import "./SafeMath.sol";
 contract NectarController is TokenController, Whitelist {
     using SafeMath for uint256;
 
-    MiniMeToken public tokenContract;   // The new token for this Campaign
+    NEC public tokenContract;   // The new token for this Campaign
     address public vaultAddress;        // The address to hold the funds donated
 
     uint public periodLength = 7;       // Contribution windows length in days
@@ -29,7 +29,7 @@ contract NectarController is TokenController, Whitelist {
         address _tokenAddress
     ) {
         require(_vaultAddress != 0);                // To prevent burning ETH
-        tokenContract = MiniMeToken(_tokenAddress); // The Deployed Token Contract
+        tokenContract = NEC(_tokenAddress); // The Deployed Token Contract
         vaultAddress = _vaultAddress;
         startTime = block.timestamp;
         windowFinalBlock[0] = block.number-1;
@@ -114,6 +114,10 @@ contract NectarController is TokenController, Whitelist {
         return true;
     }
 
+/////////////////
+// Maker and taker fee payments handling
+/////////////////
+
 
     /// @dev `doMakerPayment()` is an internal function that sends the ether that this
     ///  contract receives to the `vault` and creates tokens in the address of the
@@ -128,7 +132,7 @@ contract NectarController is TokenController, Whitelist {
         // Set the block number which will be used to calculate issuance rate during
         // this window if it has not already been set
         if(windowFinalBlock[currentWindow()-1] == 0) {
-            windowFinalBlock[currentWindow()-1] == block.number -1;
+            windowFinalBlock[currentWindow()-1] = block.number -1;
         }
 
         uint256 newIssuance = getFeeToTokenConversion(msg.value);
@@ -175,7 +179,7 @@ contract NectarController is TokenController, Whitelist {
         uint256 previousSupply = tokenContract.totalSupplyAt(calculationBlock);
         uint256 initialSupply = tokenContract.totalSupplyAt(windowFinalBlock[0]);
         uint256 feeTotal = tokenContract.totalPledgedFeesAt(calculationBlock);
-        uint256 newTokens = _contributed.mul(previousSupply.div(initialSupply.add(feeTotal)));
+        uint256 newTokens = _contributed.mul(previousSupply).div(initialSupply.add(feeTotal));
         return newTokens;
     }
 
@@ -201,6 +205,11 @@ contract NectarController is TokenController, Whitelist {
         LogFeeEvacuation(this.balance);
     }
 
+    /// @dev enableBurning - Allows this controller to activate burning on the underlying token contract
+    function enableBurning(bool _burningEnabled) onlyOwner{
+        tokenContract.enableBurning(_burningEnabled);
+    }
+
 
 //////////
 // Safety Methods
@@ -209,14 +218,9 @@ contract NectarController is TokenController, Whitelist {
     /// @notice This method can be used by the owner to extract mistakenly
     ///  sent tokens to this contract.
     /// @param _token The address of the token contract that you want to recover
-    ///  set to 0 in case you want to extract ether.
     function claimTokens(address _token) onlyOwner {
-        if (_token == 0x0) {
-            owner.transfer(this.balance);
-            return;
-        }
 
-        MiniMeToken token = MiniMeToken(_token);
+        NEC token = NEC(_token);
         uint balance = token.balanceOf(this);
         token.transfer(owner, balance);
         ClaimedTokens(_token, owner, balance);
