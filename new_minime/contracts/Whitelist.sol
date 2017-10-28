@@ -64,15 +64,15 @@ contract Whitelist is Owned {
 
   /////// Getters to allow the same whitelist to be used also by other contracts (including upgraded Controllers) ///////
 
-  function getRegistrationStatus(address _user) external returns (bool) {
+  function getRegistrationStatus(address _user) constant external returns (bool) {
     return isOnList[_user];
   }
 
-  function getAuthorisationStatus(address _maker) external returns (bool) {
+  function getAuthorisationStatus(address _maker) constant external returns (bool) {
     return isAuthorisedMaker[_maker];
   }
 
-  function getOwner() external returns (address) {
+  function getOwner() external constant returns (address) {
     return owner;
   }
 

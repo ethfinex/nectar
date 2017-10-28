@@ -124,6 +124,13 @@ contract NectarController is TokenController, Whitelist {
         require ((tokenContract.controller() != 0) && (msg.value != 0) );
         tokenContract.pledgeFees(msg.value);
         require (vaultAddress.send(msg.value));
+
+        // Set the block number which will be used to calculate issuance rate during
+        // this window if it has not already been set
+        if(windowFinalBlock[currentWindow()-1] == 0) {
+            windowFinalBlock[currentWindow()-1] == block.number -1;
+        }
+
         uint256 newIssuance = getFeeToTokenConversion(msg.value);
         require (tokenContract.generateTokens(_owner, newIssuance));
 
@@ -162,12 +169,7 @@ contract NectarController is TokenController, Whitelist {
 
     /// @dev getFeeToTokenConversion - Controller could be changed in the future to update this function
     /// @param _contributed - The value of fees contributed during the window
-    function getFeeToTokenConversion(uint256 _contributed) returns (uint256) {
-        // Set the block number which will be used to calculate issuance rate during
-        // this 28 day window if it has not already been set
-        if(windowFinalBlock[currentWindow()-1] == 0) {
-            windowFinalBlock[currentWindow()-1] == block.number -1;
-        }
+    function getFeeToTokenConversion(uint256 _contributed) constant returns (uint256) {
 
         uint calculationBlock = windowFinalBlock[currentWindow()-1];
         uint256 previousSupply = tokenContract.totalSupplyAt(calculationBlock);
