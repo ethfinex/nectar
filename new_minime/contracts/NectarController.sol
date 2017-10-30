@@ -36,7 +36,7 @@ contract NectarController is TokenController, Whitelist {
     }
 
     /// @dev The fallback function is called when ether is sent to the contract, it
-    /// simply calls `doPayment()` with the address that sent the ether as the
+    /// simply calls `doTakerPayment()` . No tokens are created when takers contribute.
     /// `_owner`. Payable is a required solidity modifier for functions to receive
     /// ether, without this modifier functions will throw if ether is sent to them
 
@@ -52,9 +52,9 @@ contract NectarController is TokenController, Whitelist {
 // TokenController interface
 /////////////////
 
-    /// @notice `proxyPayment()` allows the caller to send ether to the Campaign and
-    /// have the tokens created in an address of their choosing
-    /// @param _owner The address that will hold the newly created tokens
+    /// @notice `proxyPayment()` allows the caller to send ether to the Campaign
+    /// but does not create tokens. This functions the same as the fallback function.
+    /// @param _owner Does not do anything, but preserved because of MiniMe standard function.
     function proxyPayment(address _owner) payable returns(bool) {
         doTakerPayment();
         return true;
@@ -143,7 +143,7 @@ contract NectarController is TokenController, Whitelist {
     }
 
     /// @dev `doTakerPayment()` is an internal function that sends the ether that this
-    ///  contract receives to the `vault`
+    ///  contract receives to the `vault`, creating no tokens
     function doTakerPayment() internal {
 
         require ((tokenContract.controller() != 0) && (msg.value != 0) );
@@ -199,13 +199,12 @@ contract NectarController is TokenController, Whitelist {
         LogFeeTopUp(msg.value);
     }
 
-    /// @dev evacuateToVault - This is only used to increase this.balance in the case this controller is used to allow burning
-    function evacuateToVault() onlyOwner{
+    /// @dev evacuateToVault - This is only used to evacuate remaining to ether from this contract to the vault address
         vaultAddress.transfer(this.balance);
         LogFeeEvacuation(this.balance);
     }
 
-    /// @dev enableBurning - Allows this controller to activate burning on the underlying token contract
+    /// @dev enableBurning - Allows the owner to activate burning on the underlying token contract
     function enableBurning(bool _burningEnabled) onlyOwner{
         tokenContract.enableBurning(_burningEnabled);
     }
