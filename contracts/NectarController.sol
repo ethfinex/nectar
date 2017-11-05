@@ -103,7 +103,7 @@ contract NectarController is TokenController, Whitelist {
 
         uint256 feeTotal = tokenContract.totalPledgedFees();
         uint256 totalTokens = tokenContract.totalSupply();
-        uint256 feeValueOfTokens = feeTotal * (_tokensToBurn/totalTokens);
+        uint256 feeValueOfTokens = (feeTotal * _tokensToBurn) /totalTokens;
 
         // Destroy the owners tokens prior to sending them the associated fees
         require (tokenContract.destroyTokens(_owner, _tokensToBurn));
