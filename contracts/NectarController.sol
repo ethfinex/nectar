@@ -200,6 +200,7 @@ contract NectarController is TokenController, Whitelist {
     }
 
     /// @dev evacuateToVault - This is only used to evacuate remaining to ether from this contract to the vault address
+    function evacuateToVault() onlyOwner{
         vaultAddress.transfer(this.balance);
         LogFeeEvacuation(this.balance);
     }
