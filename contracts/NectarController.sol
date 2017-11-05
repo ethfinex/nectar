@@ -1,7 +1,7 @@
 pragma solidity ^0.4.11;
 
 import "./NEC.sol";
-import "./WhiteList.sol";
+import "./Whitelist.sol";
 import "./SafeMath.sol";
 
 /*
