@@ -1,4 +1,4 @@
-pragma solidity ^0.4.11;
+pragma solidity ^0.4.18;
 
 
 import "./Owned.sol";
@@ -11,10 +11,15 @@ import "./Owned.sol";
 /// @title Whitelist contract - Only addresses which are registered as part of the market maker loyalty scheme can be whitelisted to earn and own Nectar tokens
 contract Whitelist is Owned {
 
+  bool public listActive = true;
+
   // Only users who are on the whitelist
-  modifier isWhitelisted () {
-    require(isOnList[msg.sender]);
-    _;
+  function isRegistered(address _user) public constant returns (bool) {
+    if (!listActive) {
+      return true;
+    } else {
+      return isOnList[_user];
+    }
   }
 
   // Only authorised sources/contracts can contribute fees on behalf of makers to earn tokens
@@ -32,7 +37,7 @@ contract Whitelist is Owned {
 
   /// @dev register
   /// @param newUsers - Array of users to add to the whitelist
-  function register(address[] newUsers) onlyOwner {
+  function register(address[] newUsers) public onlyOwner {
     for (uint i = 0; i < newUsers.length; i++) {
       isOnList[newUsers[i]] = true;
     }
@@ -40,7 +45,7 @@ contract Whitelist is Owned {
 
   /// @dev deregister
   /// @param bannedUsers - Array of users to remove from the whitelist
-  function deregister(address[] bannedUsers) onlyOwner {
+  function deregister(address[] bannedUsers) public onlyOwner {
     for (uint i = 0; i < bannedUsers.length; i++) {
       isOnList[bannedUsers[i]] = false;
     }
@@ -48,7 +53,7 @@ contract Whitelist is Owned {
 
   /// @dev authoriseMaker
   /// @param maker - Source to add to authorised contributors
-  function authoriseMaker(address maker) onlyOwner {
+  function authoriseMaker(address maker) public onlyOwner {
       isAuthorisedMaker[maker] = true;
       // Also add any authorised Maker to the whitelist
       address[] memory makers = new address[](1);
@@ -58,8 +63,12 @@ contract Whitelist is Owned {
 
   /// @dev deauthoriseMaker
   /// @param maker - Source to remove from authorised contributors
-  function deauthoriseMaker(address maker) onlyOwner {
+  function deauthoriseMaker(address maker) public onlyOwner {
       isAuthorisedMaker[maker] = false;
+  }
+
+  function activateWhitelist(bool newSetting) public onlyOwner {
+      listActive = newSetting;
   }
 
   /////// Getters to allow the same whitelist to be used also by other contracts (including upgraded Controllers) ///////

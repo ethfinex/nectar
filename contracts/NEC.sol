@@ -1,4 +1,4 @@
-pragma solidity ^0.4.11;
+pragma solidity ^0.4.18;
 
 import "./MiniMeToken.sol";
 
@@ -11,7 +11,7 @@ contract NEC is MiniMeToken {
   function NEC(
     address _tokenFactory,
     address efxVaultWallet
-  ) MiniMeToken(
+  ) public MiniMeToken(
     _tokenFactory,
     0x0,                    // no parent token
     0,                      // no snapshot block number from parent
@@ -32,11 +32,11 @@ contract NEC is MiniMeToken {
 // Enable token burning by users
 ////////////////
 
-    function enableBurning(bool _burningEnabled) onlyController {
+    function enableBurning(bool _burningEnabled) public onlyController {
         burningEnabled = _burningEnabled;
     }
 
-    function burnAndRetrieve(uint256 _tokensToBurn) returns (bool success) {
+    function burnAndRetrieve(uint256 _tokensToBurn) public returns (bool success) {
         require(burningEnabled);
 
         var previousBalanceFrom = balanceOfAt(msg.sender, block.number);

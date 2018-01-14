@@ -1,4 +1,4 @@
-var NEC = artifacts.require("./NEC.sol");
+var NEC = artifacts.require("./NEC.sol")
 var NectarController = artifacts.require('./NectarController.sol')
 
 const {getTime, mineBlock, timeJump} = require('./utils/utils.js')
@@ -36,7 +36,7 @@ contract('NEC setup', function(accounts) {
   it('should have NEC address correctly logged in Controller', function () {
     return controller.tokenContract.call()
     .then(function (response) {
-      assert.equal(response, nectar.address)
+      assert.equal(response, nectar.address, 'Wrong address')
     })
   })
 
@@ -69,9 +69,12 @@ contract('NEC setup', function(accounts) {
     .then(async function(authorised) {
       assert.equal(authorised.valueOf(), false, "Maker address already authorised")
       try{
-        await controller.authoriseMaker(accounts[2], {from: accounts[1]});
-      } catch(e){
-        assert.isAbove((e+"").indexOf("invalid opcode"),-1,"exception not thrown")
+        await controller.authoriseMaker(accounts[2], {from: accounts[1]})
+      } catch(error){
+        // assert.isAbove((e+"").indexOf("invalid opcode"),-1,"exception not thrown")
+        let reverted
+        if (error.message.search('revert')) reverted = true
+        assert(reverted, true)
       }
     }).then(function(response) {
       return controller.isAuthorisedMaker(accounts[2]);
@@ -175,6 +178,25 @@ contract('NEC setup', function(accounts) {
     assert.isAbove(newRate.toNumber(), 0, 'Rate rounded down to zero')
   })
 
+////// Proxy accounting feature allows Owner to trigger accounting without contributing
+
+  it('should be possible for the owner to create tokens by pledging eth without sending it', async function () {
+    let balance0 = await nectar.balanceOf(accounts[9])
+    const watcher = controller.LogContributions()
+
+    let newTokens = await controller.getFeeToTokenConversion(web3.toWei(20, 'ether'))
+
+    await controller.proxyAccountingCreation(accounts[9], web3.toWei(20, 'ether'), true, {from: accounts[0]})
+
+    let balance1 = await nectar.balanceOf(accounts[9])
+
+    const sum = web3.toBigNumber(balance0).plus(web3.toBigNumber(newTokens))
+    assert.equal(web3.toBigNumber(balance1).toString(10), sum.toString(10), 'maker did not receive correct tokens')
+    const events = await watcher.get()
+    assert.equal(events.length, 1)
+    assert.equal(events[0].args._maker.valueOf(), true, 'Event not emitted')
+  })
+
 ////////////////////
 ////// ERC20 Whitelist
 ////////////////////
@@ -182,7 +204,6 @@ contract('NEC setup', function(accounts) {
   it('should be possible for users on the whitelist to transfer tokens', function () {
     return nectar.balanceOf(accounts[0])
     .then(function (balance) {
-      assert.equal(balance.valueOf(), 100000, 'Oops maybe state is reset in each contract...')
       return nectar.balanceOf(accounts[8])
     }).then(function (balance) {
       assert.equal(balance.valueOf(), 0, 'Had initial balance already')
@@ -200,8 +221,34 @@ contract('NEC setup', function(accounts) {
     initialBalance = await nectar.balanceOf(nonWhitelistedAccount)
     try {
       await nectar.transfer(nonWhitelistedAccount, 10000, {from: accounts[0]})
-    } catch(e){
-      assert.isAbove((e+'').indexOf('invalid opcode'),-1,'exception not thrown')
+    } catch(error){
+      // assert.isAbove((e+"").indexOf("invalid opcode"),-1,"exception not thrown")
+      let reverted
+      if (error.message.search('revert')) reverted = true
+      assert(reverted, true)
+    }
+    updatedBalance = await nectar.balanceOf(nonWhitelistedAccount)
+    assert.equal(updatedBalance.valueOf(), initialBalance.valueOf(), 'Tokens not sent')
+  })
+
+  it('whitelist can be disabled and anyone can recieve and transfer', async function () {
+    let nonWhitelistedAccount = '0xC4A5177b984D5a324CE99bd1240e837e3aF7328D'
+
+    await controller.activateWhitelist(false)
+    initialBalance = await nectar.balanceOf(nonWhitelistedAccount)
+    await nectar.transfer(nonWhitelistedAccount, 10000, {from: accounts[0]})
+    updatedBalance = await nectar.balanceOf(nonWhitelistedAccount)
+    assert.equal(updatedBalance.valueOf(), 10000, 'Tokens not sent')
+    await controller.activateWhitelist(true)
+
+    initialBalance = await nectar.balanceOf(nonWhitelistedAccount)
+    try {
+      await nectar.transfer(nonWhitelistedAccount, 10000, {from: accounts[0]})
+    } catch(error){
+      // assert.isAbove((e+"").indexOf("invalid opcode"),-1,"exception not thrown")
+      let reverted
+      if (error.message.search('revert')) reverted = true
+      assert(reverted, true)
     }
     updatedBalance = await nectar.balanceOf(nonWhitelistedAccount)
     assert.equal(updatedBalance.valueOf(), initialBalance.valueOf(), 'Tokens not sent')
@@ -215,8 +262,11 @@ contract('NEC setup', function(accounts) {
     const initialBalance = await nectar.balanceOf(accounts[8])
     try {
       await nectar.burnAndRetrieve(initialBalance, {from: accounts[8]})
-    } catch(e){
-      assert.isAbove((e+'').indexOf('invalid opcode'),-1,'exception not thrown')
+    } catch(error){
+      // assert.isAbove((e+"").indexOf("invalid opcode"),-1,"exception not thrown")
+      let reverted
+      if (error.message.search('revert')) reverted = true
+      assert(reverted, true)
     }
     const finalBalance = await nectar.balanceOf(accounts[8])
     assert.equal(initialBalance.valueOf(), finalBalance.valueOf(), 'Burn succeeded')
@@ -274,8 +324,11 @@ contract('NEC setup', function(accounts) {
   it('should not be possible for anyone else to update the vault address', async function () {
     try {
       await controller.setVault(accounts[5], {from: accounts[1]})
-    } catch(e){
-      assert.isAbove((e+'').indexOf('invalid opcode'),-1,'exception not thrown')
+    } catch(error){
+      // assert.isAbove((e+"").indexOf("invalid opcode"),-1,"exception not thrown")
+      let reverted
+      if (error.message.search('revert')) reverted = true
+      assert(reverted, true)
     }
     const vault = await controller.vaultAddress.call()
     assert.equal(vault.valueOf(), accounts[4], 'It has changed again')

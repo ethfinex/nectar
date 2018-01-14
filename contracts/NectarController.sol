@@ -1,11 +1,11 @@
-pragma solidity ^0.4.11;
+pragma solidity ^0.4.18;
 
 import "./NEC.sol";
 import "./Whitelist.sol";
 import "./SafeMath.sol";
 
 /*
-    Copyright 2017, Will Harborne (Ethfinex)
+    Copyright 2018, Will Harborne (Ethfinex)
 */
 
 contract NectarController is TokenController, Whitelist {
@@ -27,7 +27,7 @@ contract NectarController is TokenController, Whitelist {
     function NectarController(
         address _vaultAddress,
         address _tokenAddress
-    ) {
+    ) public {
         require(_vaultAddress != 0);                // To prevent burning ETH
         tokenContract = NEC(_tokenAddress); // The Deployed Token Contract
         vaultAddress = _vaultAddress;
@@ -40,11 +40,11 @@ contract NectarController is TokenController, Whitelist {
     /// `_owner`. Payable is a required solidity modifier for functions to receive
     /// ether, without this modifier functions will throw if ether is sent to them
 
-    function ()  payable {
+    function ()  public payable {
         doTakerPayment();
     }
 
-    function contributeForMakers(address _owner) payable authorised {
+    function contributeForMakers(address _owner) public payable authorised {
         doMakerPayment(_owner);
     }
 
@@ -55,10 +55,19 @@ contract NectarController is TokenController, Whitelist {
     /// @notice `proxyPayment()` allows the caller to send ether to the Campaign
     /// but does not create tokens. This functions the same as the fallback function.
     /// @param _owner Does not do anything, but preserved because of MiniMe standard function.
-    function proxyPayment(address _owner) payable returns(bool) {
+    function proxyPayment(address _owner) public payable returns(bool) {
         doTakerPayment();
         return true;
     }
+
+    /// @notice `proxyAccountingCreation()` allows owner to create tokens without sending ether via the contract
+    /// Creates tokens, pledging an amount of eth to token holders but not sending it through the contract to the vault
+    /// @param _owner The person who will have the created tokens
+    function proxyAccountingCreation(address _owner, uint _pledgedAmount, bool _create) public onlyOwner returns(bool) {
+        doProxyAccounting(_owner, _pledgedAmount, _create);
+        return true;
+    }
+
 
     /// @notice Notifies the controller about a transfer.
     /// Transfers can only happen to whitelisted addresses
@@ -66,8 +75,8 @@ contract NectarController is TokenController, Whitelist {
     /// @param _to The destination of the transfer
     /// @param _amount The amount of the transfer
     /// @return False if the controller does not authorize the transfer
-    function onTransfer(address _from, address _to, uint _amount) returns(bool) {
-        if (isOnList[_to] && isOnList[_from]) {
+    function onTransfer(address _from, address _to, uint _amount) public returns(bool) {
+        if (isRegistered(_to) && isRegistered(_from)) {
           return true;
         } else {
           return false;
@@ -80,10 +89,10 @@ contract NectarController is TokenController, Whitelist {
     /// @param _spender The spender in the `approve()` call
     /// @param _amount The amount in the `approve()` call
     /// @return False if the controller does not authorize the approval
-    function onApprove(address _owner, address _spender, uint _amount)
+    function onApprove(address _owner, address _spender, uint _amount) public
         returns(bool)
     {
-        if (isOnList[_owner]) {
+        if (isRegistered(_owner)) {
           return true;
         } else {
           return false;
@@ -95,7 +104,7 @@ contract NectarController is TokenController, Whitelist {
     /// @param _owner The address that calls `burn()`
     /// @param _tokensToBurn The amount in the `burn()` call
     /// @return False if the controller does not authorize the approval
-    function onBurn(address _owner, uint _tokensToBurn)
+    function onBurn(address _owner, uint _tokensToBurn) public
         returns(bool)
     {
         // This plugin can only be called by the token contract
@@ -103,7 +112,7 @@ contract NectarController is TokenController, Whitelist {
 
         uint256 feeTotal = tokenContract.totalPledgedFees();
         uint256 totalTokens = tokenContract.totalSupply();
-        uint256 feeValueOfTokens = (feeTotal * _tokensToBurn) /totalTokens;
+        uint256 feeValueOfTokens = (feeTotal.mul(_tokensToBurn)).div(totalTokens);
 
         // Destroy the owners tokens prior to sending them the associated fees
         require (tokenContract.destroyTokens(_owner, _tokensToBurn));
@@ -154,15 +163,36 @@ contract NectarController is TokenController, Whitelist {
         return;
     }
 
+    /// @dev `doProxyAccounting()` is an internal function that creates tokens
+    /// for fees pledged by the owner
+    function doProxyAccounting(address _owner, uint _pledgedAmount, bool _create) internal {
+
+        require ((tokenContract.controller() != 0));
+        tokenContract.pledgeFees(_pledgedAmount);
+        if(_create) {
+            // Set the block number which will be used to calculate issuance rate during
+            // this window if it has not already been set
+            if(windowFinalBlock[currentWindow()-1] == 0) {
+                windowFinalBlock[currentWindow()-1] = block.number -1;
+              }
+
+              uint256 newIssuance = getFeeToTokenConversion(_pledgedAmount);
+              require (tokenContract.generateTokens(_owner, newIssuance));
+        }
+
+        LogContributions (msg.sender, _pledgedAmount, _create);
+        return;
+    }
+
     /// @notice `onlyOwner` changes the location that ether is sent
     /// @param _newVaultAddress The address that will store the fees collected
-    function setVault(address _newVaultAddress) onlyOwner {
+    function setVault(address _newVaultAddress) public onlyOwner {
         vaultAddress = _newVaultAddress;
     }
 
     /// @notice `onlyOwner` can upgrade the controller contract
     /// @param _newControllerAddress The address that will have the token control logic
-    function upgradeController(address _newControllerAddress) onlyOwner {
+    function upgradeController(address _newControllerAddress) public onlyOwner {
         tokenContract.changeController(_newControllerAddress);
         UpgradedController(_newControllerAddress);
     }
@@ -173,7 +203,7 @@ contract NectarController is TokenController, Whitelist {
 
     /// @dev getFeeToTokenConversion - Controller could be changed in the future to update this function
     /// @param _contributed - The value of fees contributed during the window
-    function getFeeToTokenConversion(uint256 _contributed) constant returns (uint256) {
+    function getFeeToTokenConversion(uint256 _contributed) public constant returns (uint256) {
 
         uint calculationBlock = windowFinalBlock[currentWindow()-1];
         uint256 previousSupply = tokenContract.totalSupplyAt(calculationBlock);
@@ -183,30 +213,30 @@ contract NectarController is TokenController, Whitelist {
         return newTokens;
     }
 
-    function currentWindow() constant returns (uint) {
+    function currentWindow() public constant returns (uint) {
        return windowAt(block.timestamp);
     }
 
-    function windowAt(uint timestamp) constant returns (uint) {
+    function windowAt(uint timestamp) public constant returns (uint) {
       return timestamp < startTime
           ? 0
           : timestamp.sub(startTime).div(periodLength * 1 days) + 1;
     }
 
     /// @dev topUpBalance - This is only used to increase this.balance in the case this controller is used to allow burning
-    function topUpBalance() payable {
+    function topUpBalance() public payable {
         // Pledged fees could be sent here and used to payout users who burn their tokens
         LogFeeTopUp(msg.value);
     }
 
     /// @dev evacuateToVault - This is only used to evacuate remaining to ether from this contract to the vault address
-    function evacuateToVault() onlyOwner{
+    function evacuateToVault() public onlyOwner{
         vaultAddress.transfer(this.balance);
         LogFeeEvacuation(this.balance);
     }
 
     /// @dev enableBurning - Allows the owner to activate burning on the underlying token contract
-    function enableBurning(bool _burningEnabled) onlyOwner{
+    function enableBurning(bool _burningEnabled) public onlyOwner{
         tokenContract.enableBurning(_burningEnabled);
     }
 
@@ -218,7 +248,7 @@ contract NectarController is TokenController, Whitelist {
     /// @notice This method can be used by the owner to extract mistakenly
     ///  sent tokens to this contract.
     /// @param _token The address of the token contract that you want to recover
-    function claimTokens(address _token) onlyOwner {
+    function claimTokens(address _token) public onlyOwner {
 
         NEC token = NEC(_token);
         uint balance = token.balanceOf(this);
