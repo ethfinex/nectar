@@ -20,7 +20,7 @@ contract NEC is MiniMeToken {
     "NEC",                  // Symbol
     true                    // Enable transfers
     ) {
-        generateTokens(efxVaultWallet, 100000000000000000000000);
+        generateTokens(efxVaultWallet, 1000000000000000000000000000);
         enableBurning(false);
     }
 

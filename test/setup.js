@@ -1,36 +1,35 @@
+var MiniMeTokenFactory = artifacts.require('MiniMeTokenFactory')
 var NEC = artifacts.require("./NEC.sol")
 var NectarController = artifacts.require('./NectarController.sol')
 
 const {getTime, mineBlock, timeJump} = require('./utils/utils.js')
 
-var nectar
-var controller
+let nectar
+let controller
+let factory
+
+// Cold Storage
+var efxVaultWallet = '0x66f3edf3865b9830911614462d5fd81a0a798808'
 
 contract('NEC setup', function(accounts) {
 
-  it('should be initialised with 100000 NEC totalSupply for vault', function () {
-    return NEC.deployed().then(function (instance) {
-      nectar = instance
-      return instance.totalSupply.call()
-    }).then(function (supply) {
-      assert.equal(supply.valueOf(), 100000000000000000000000, "100000 wasn't set as the totalSupply in initialisation")
-      return nectar.generateTokens(accounts[0], 100000)
-    }).then(function (response){
-      return nectar.balanceOf(accounts[0])
-    }).then(function (balance) {
-      assert.equal(balance.valueOf(), 100000, "Generation did not work")
-    })
+  it('should be initialised with 1 billion NEC totalSupply for vault', async function () {
+    factory = await MiniMeTokenFactory.new()
+    nectar = await NEC.new(MiniMeTokenFactory.address, efxVaultWallet)
+    controller = await NectarController.new(efxVaultWallet, nectar.address)
+
+    supply = await nectar.totalSupply.call()
+    assert.equal(supply.valueOf(), 1000000000000000000000000000, "1 billion wasn't set as the totalSupply in initialisation")
+    await nectar.generateTokens(accounts[0], 100000000000000)
+    balance = await nectar.balanceOf(accounts[0])
+    assert.equal(balance.valueOf(), 100000000000000, "Generation did not work")
   })
 
-  it('should change the Controller to the Controller Contract', function () {
-    return NectarController.deployed().then(function (instance) {
-      controller = instance
-      return nectar.changeController(controller.address, {from: accounts[0]})
-    }).then(function () {
-      return nectar.controller.call()
-    }).then(function (result) {
-      assert.equal(result, controller.address, 'The controller was not correctly set')
-    })
+  it('should change the Controller to the Controller Contract', async function () {
+
+    await nectar.changeController(controller.address, {from: accounts[0]})
+    const controllerAddress = await nectar.controller.call()
+    assert.equal(controllerAddress, controller.address, 'The controller was not correctly set')
   })
 
   it('should have NEC address correctly logged in Controller', function () {
@@ -125,18 +124,18 @@ contract('NEC setup', function(accounts) {
     rate4 = rate4 / web3.toWei(5, 'ether')
     rate5 = rate5 / 5
 
-    assert.equal(rate1, 1, 'First window rate is not equal to 1')
-    assert.equal(rate2, 1, 'First window rate is not equal to 1')
-    assert.equal(rate3, 1, 'First window rate is not equal to 1')
-    assert.equal(rate4, 1, 'First window rate is not equal to 1')
-    assert.equal(rate5, 1, 'Rounding error')
+    assert.equal(rate1, 1000, 'First window rate is not equal to 1')
+    assert.equal(rate2, 1000, 'First window rate is not equal to 1')
+    assert.equal(rate3, 1000, 'First window rate is not equal to 1')
+    assert.equal(rate4, 1000, 'First window rate is not equal to 1')
+    assert.equal(rate5, 1000, 'Rounding error')
   })
 
   it('should get tokens for contributing as a maker', async function () {
     const watcher = controller.LogContributions()
     await controller.contributeForMakers(accounts[6], {value: web3.toWei(1, 'ether'), from: accounts[1], gas: 500000})
     balance0 = await nectar.balanceOf(accounts[6])
-    assert.equal(balance0.valueOf(), web3.toWei(1,'ether'), 'maker did not receive tokens')
+    assert.equal(balance0.valueOf(), 1000 * web3.toWei(1,'ether'), 'maker did not receive tokens')
     const events = await watcher.get()
     assert.equal(events.length, 1)
     assert.equal(events[0].args._maker.valueOf(), true, 'Event not emitted')
@@ -156,17 +155,17 @@ contract('NEC setup', function(accounts) {
     const watcher = controller.LogContributions()
     await controller.contributeForMakers(accounts[6], {value: paid, from: accounts[1], gas: 500000})
     let balance1 = await nectar.balanceOf(accounts[6])
-    assert.equal(balance1.toNumber(), balance0.toNumber() + 20000000000000000000, 'maker did not receive tokens')
+    assert.equal(balance1.toNumber(), balance0.toNumber() + 1000 * 20000000000000000000, 'maker did not receive tokens')
     const events = await watcher.get()
     assert.equal(events.length, 1)
     assert.equal(events[0].args._maker.valueOf(), true, 'Event not emitted')
   })
 
-////// Change clock time forward 7 days
+////// Change clock time forward 30 days
 
   it('should have a slightly lower contribution rate when going into the next window', async function () {
 
-    await timeJump(7 * 24 * 60 * 60 + 10)
+    await timeJump(30 * 24 * 60 * 60 + 10)
     await mineBlock()
 
     await controller.contributeForMakers(accounts[9], {value: web3.toWei(0.5,'ether'), from: accounts[1], gas: 500000})
@@ -174,7 +173,7 @@ contract('NEC setup', function(accounts) {
     let newWindow = await controller.currentWindow()
     assert.equal(newWindow.valueOf(), 2, 'Wrong window')
     let newRate = await controller.getFeeToTokenConversion(web3.toWei(1, 'ether'))
-    assert.isAbove(web3.toBigNumber(web3.toWei(1, 'ether')).toNumber(), newRate, 'Rate did not decrease')
+    assert.isAbove(web3.toBigNumber(1000 * web3.toWei(1, 'ether')).toNumber(), newRate, 'Rate did not decrease')
     assert.isAbove(newRate.toNumber(), 0, 'Rate rounded down to zero')
   })
 
@@ -186,7 +185,7 @@ contract('NEC setup', function(accounts) {
 
     let newTokens = await controller.getFeeToTokenConversion(web3.toWei(20, 'ether'))
 
-    await controller.proxyAccountingCreation(accounts[9], web3.toWei(20, 'ether'), true, {from: accounts[0]})
+    await controller.proxyAccountingCreation(accounts[9], web3.toWei(20, 'ether'), newTokens, {from: accounts[0]})
 
     let balance1 = await nectar.balanceOf(accounts[9])
 
@@ -207,11 +206,11 @@ contract('NEC setup', function(accounts) {
       return nectar.balanceOf(accounts[8])
     }).then(function (balance) {
       assert.equal(balance.valueOf(), 0, 'Had initial balance already')
-      return nectar.transfer(accounts[8], 10000, {from: accounts[0]})
+      return nectar.transfer(accounts[8], 90000000000000, {from: accounts[0]})
     }).then(function (response) {
       return nectar.balanceOf(accounts[8])
     }).then(function (balance){
-      assert.equal(balance.valueOf(), 10000, 'Tokens not sent')
+      assert.equal(balance.valueOf(), 90000000000000, 'Tokens not sent')
     })
   })
 

@@ -14,7 +14,7 @@ contract NectarController is TokenController, Whitelist {
     NEC public tokenContract;   // The new token for this Campaign
     address public vaultAddress;        // The address to hold the funds donated
 
-    uint public periodLength = 7;       // Contribution windows length in days
+    uint public periodLength = 30;       // Contribution windows length in days
     uint public startTime;              // Time of window 1 opening
 
     mapping (uint => uint) public windowFinalBlock;  // Final block before initialisation of new window
@@ -63,8 +63,13 @@ contract NectarController is TokenController, Whitelist {
     /// @notice `proxyAccountingCreation()` allows owner to create tokens without sending ether via the contract
     /// Creates tokens, pledging an amount of eth to token holders but not sending it through the contract to the vault
     /// @param _owner The person who will have the created tokens
-    function proxyAccountingCreation(address _owner, uint _pledgedAmount, bool _create) public onlyOwner returns(bool) {
-        doProxyAccounting(_owner, _pledgedAmount, _create);
+    function proxyAccountingCreation(address _owner, uint _pledgedAmount, uint _tokensToCreate) public onlyOwner returns(bool) {
+        // Ethfinex is a hybrid decentralised exchange
+        // This function is only for use to create tokens on behalf of users of the centralised side of Ethfinex
+        // Because there are several different fee tiers (depending on trading volume) token creation rates may not always be proportional to fees contributed.
+        // For example if a user is trading with a 0.025% fee as opposed to the standard 0.1% the tokensToCreate the pledged fees will be lower than through using the standard contributeForMakers function
+        // Tokens to create must be calculated off-chain using the issuance equation and current parameters of this contract, multiplied depending on user's fee tier
+        doProxyAccounting(_owner, _pledgedAmount, _tokensToCreate);
         return true;
     }
 
@@ -165,22 +170,20 @@ contract NectarController is TokenController, Whitelist {
 
     /// @dev `doProxyAccounting()` is an internal function that creates tokens
     /// for fees pledged by the owner
-    function doProxyAccounting(address _owner, uint _pledgedAmount, bool _create) internal {
+    function doProxyAccounting(address _owner, uint _pledgedAmount, uint _tokensToCreate) internal {
 
         require ((tokenContract.controller() != 0));
+        if(windowFinalBlock[currentWindow()-1] == 0) {
+            windowFinalBlock[currentWindow()-1] = block.number -1;
+        }
         tokenContract.pledgeFees(_pledgedAmount);
-        if(_create) {
-            // Set the block number which will be used to calculate issuance rate during
-            // this window if it has not already been set
-            if(windowFinalBlock[currentWindow()-1] == 0) {
-                windowFinalBlock[currentWindow()-1] = block.number -1;
-              }
 
-              uint256 newIssuance = getFeeToTokenConversion(_pledgedAmount);
-              require (tokenContract.generateTokens(_owner, newIssuance));
+        if(_tokensToCreate > 0) {
+            uint256 newIssuance = getFeeToTokenConversion(_pledgedAmount);
+            require (tokenContract.generateTokens(_owner, _tokensToCreate));
         }
 
-        LogContributions (msg.sender, _pledgedAmount, _create);
+        LogContributions (msg.sender, _pledgedAmount, true);
         return;
     }
 
@@ -205,11 +208,16 @@ contract NectarController is TokenController, Whitelist {
     /// @param _contributed - The value of fees contributed during the window
     function getFeeToTokenConversion(uint256 _contributed) public constant returns (uint256) {
 
+        // FYI this assumes a fixed maker trading fee of 0.1%
+        // In the case where different fee schedules were used for maker discounts
+        // i.e. 0.025% - 4 times the number of tokens would be generated per fee
+        // Since these fee discounts are only available via the centralised part of Ethfinex
+
         uint calculationBlock = windowFinalBlock[currentWindow()-1];
         uint256 previousSupply = tokenContract.totalSupplyAt(calculationBlock);
         uint256 initialSupply = tokenContract.totalSupplyAt(windowFinalBlock[0]);
         uint256 feeTotal = tokenContract.totalPledgedFeesAt(calculationBlock);
-        uint256 newTokens = _contributed.mul(previousSupply).div(initialSupply.add(feeTotal));
+        uint256 newTokens = (_contributed.mul(previousSupply.div(1000)).div((initialSupply.div(1000)).add(feeTotal))).mul(1000);
         return newTokens;
     }
 
