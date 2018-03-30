@@ -10,9 +10,9 @@ A summary of the design choices and purpose of the Nectar token is available her
 
 ### Deploy History
 
-13th February - [NEC deployed](https://etherscan.io/tx/0x4041cf804f1628c26905e1efce969e254e195b3a5ee8951a27f7039c1af5ab06)
+13th February - [NEC deployed](https://etherscan.io/tx/0x4041cf804f1628c26905e1efce969e254e195b3a5ee8951a27f7039c1af5ab06) - commit fc5e6d575830ee48f0a54449e32d9dc5992f6997
 
-13th February - [Nectar Controller 1 deployed](https://etherscan.io/tx/0x840648dc7a64e0c259f278985b78ff475b6651f040ba2a4425e3515b350407ca)
+13th February - [Nectar Controller 1 deployed](https://etherscan.io/tx/0x840648dc7a64e0c259f278985b78ff475b6651f040ba2a4425e3515b350407ca) - commit fc5e6d575830ee48f0a54449e32d9dc5992f6997
 
 
 ## Contracts summary
