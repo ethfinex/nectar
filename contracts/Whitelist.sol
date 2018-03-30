@@ -11,6 +11,10 @@ import "./Owned.sol";
 /// @title Whitelist contract - Only addresses which are registered as part of the market maker loyalty scheme can be whitelisted to earn and own Nectar tokens
 contract Whitelist is Owned {
 
+  function Whitelist() {
+    admins[msg.sender] = true;
+  }
+
   bool public listActive = true;
 
   // Only users who are on the whitelist
@@ -22,11 +26,36 @@ contract Whitelist is Owned {
     }
   }
 
+  // Can add people to the whitelist
+  function isAdmin(address _admin) public view returns(bool) {
+    return admins[_admin];
+  }
+
+  /// @notice The owner is able to add new admin
+  /// @param _newAdmin Address of new admin
+  function addAdmin(address _newAdmin) public onlyOwner {
+    admins[_newAdmin] = true;
+  }
+
+  /// @notice Only owner is able to remove admin
+  /// @param _admin Address of current admin
+  function removeAdmin(address _admin) public onlyOwner {
+    admins[_admin] = false;
+  }
+
   // Only authorised sources/contracts can contribute fees on behalf of makers to earn tokens
   modifier authorised () {
     require(isAuthorisedMaker[msg.sender]);
     _;
   }
+
+  modifier onlyAdmins() {
+    require(isAdmin(msg.sender));
+    _;
+  }
+
+  // These admins are able to add new users to the whitelist
+  mapping (address => bool) public admins;
 
   // This is the whitelist of users who are registered to be able to own the tokens
   mapping (address => bool) public isOnList;
@@ -37,7 +66,7 @@ contract Whitelist is Owned {
 
   /// @dev register
   /// @param newUsers - Array of users to add to the whitelist
-  function register(address[] newUsers) public onlyOwner {
+  function register(address[] newUsers) public onlyAdmins {
     for (uint i = 0; i < newUsers.length; i++) {
       isOnList[newUsers[i]] = true;
     }
@@ -45,7 +74,7 @@ contract Whitelist is Owned {
 
   /// @dev deregister
   /// @param bannedUsers - Array of users to remove from the whitelist
-  function deregister(address[] bannedUsers) public onlyOwner {
+  function deregister(address[] bannedUsers) public onlyAdmins {
     for (uint i = 0; i < bannedUsers.length; i++) {
       isOnList[bannedUsers[i]] = false;
     }

@@ -1,4 +1,4 @@
-pragma solidity ^0.4.18;
+pragma solidity 0.4.21;
 
 import "./NEC.sol";
 import "./Whitelist.sol";
@@ -6,6 +6,7 @@ import "./SafeMath.sol";
 
 /*
     Copyright 2018, Will Harborne (Ethfinex)
+    v2.0.0
 */
 
 contract NectarController is TokenController, Whitelist {
@@ -15,7 +16,7 @@ contract NectarController is TokenController, Whitelist {
     address public vaultAddress;        // The address to hold the funds donated
 
     uint public periodLength = 30;       // Contribution windows length in days
-    uint public startTime;              // Time of window 1 opening
+    uint public startTime = 1518523865;  // Time of window 1 opening
 
     mapping (uint => uint) public windowFinalBlock;  // Final block before initialisation of new window
 
@@ -31,8 +32,8 @@ contract NectarController is TokenController, Whitelist {
         require(_vaultAddress != 0);                // To prevent burning ETH
         tokenContract = NEC(_tokenAddress); // The Deployed Token Contract
         vaultAddress = _vaultAddress;
-        startTime = block.timestamp;
-        windowFinalBlock[0] = block.number-1;
+        windowFinalBlock[0] = 5082733;
+        windowFinalBlock[1] = 5260326;
     }
 
     /// @dev The fallback function is called when ether is sent to the contract, it
@@ -121,10 +122,10 @@ contract NectarController is TokenController, Whitelist {
 
         // Destroy the owners tokens prior to sending them the associated fees
         require (tokenContract.destroyTokens(_owner, _tokensToBurn));
-        require (this.balance >= feeValueOfTokens);
+        require (address(this).balance >= feeValueOfTokens);
         require (_owner.send(feeValueOfTokens));
 
-        LogClaim(_owner, feeValueOfTokens);
+        emit LogClaim(_owner, feeValueOfTokens);
         return true;
     }
 
@@ -152,7 +153,7 @@ contract NectarController is TokenController, Whitelist {
         uint256 newIssuance = getFeeToTokenConversion(msg.value);
         require (tokenContract.generateTokens(_owner, newIssuance));
 
-        LogContributions (_owner, msg.value, true);
+        emit LogContributions (_owner, msg.value, true);
         return;
     }
 
@@ -164,7 +165,7 @@ contract NectarController is TokenController, Whitelist {
         tokenContract.pledgeFees(msg.value);
         require (vaultAddress.send(msg.value));
 
-        LogContributions (msg.sender, msg.value, false);
+        emit LogContributions (msg.sender, msg.value, false);
         return;
     }
 
@@ -183,7 +184,7 @@ contract NectarController is TokenController, Whitelist {
             require (tokenContract.generateTokens(_owner, _tokensToCreate));
         }
 
-        LogContributions (msg.sender, _pledgedAmount, true);
+        emit LogContributions (msg.sender, _pledgedAmount, true);
         return;
     }
 
@@ -197,28 +198,31 @@ contract NectarController is TokenController, Whitelist {
     /// @param _newControllerAddress The address that will have the token control logic
     function upgradeController(address _newControllerAddress) public onlyOwner {
         tokenContract.changeController(_newControllerAddress);
-        UpgradedController(_newControllerAddress);
+        emit UpgradedController(_newControllerAddress);
     }
 
 /////////////////
 // Issuance reward related functions - upgraded by changing controller
 /////////////////
 
-    /// @dev getFeeToTokenConversion - Controller could be changed in the future to update this function
+    /// @dev getFeeToTokenConversion (v2) - Controller could be changed in the future to update this function
     /// @param _contributed - The value of fees contributed during the window
-    function getFeeToTokenConversion(uint256 _contributed) public constant returns (uint256) {
-
-        // FYI this assumes a fixed maker trading fee of 0.1%
-        // In the case where different fee schedules were used for maker discounts
-        // i.e. 0.025% - 4 times the number of tokens would be generated per fee
-        // Since these fee discounts are only available via the centralised part of Ethfinex
+    function getFeeToTokenConversion(uint256 _contributed) public view returns (uint256) {
 
         uint calculationBlock = windowFinalBlock[currentWindow()-1];
         uint256 previousSupply = tokenContract.totalSupplyAt(calculationBlock);
         uint256 initialSupply = tokenContract.totalSupplyAt(windowFinalBlock[0]);
-        uint256 feeTotal = tokenContract.totalPledgedFeesAt(calculationBlock);
-        uint256 newTokens = (_contributed.mul(previousSupply.div(1000)).div((initialSupply.div(1000)).add(feeTotal))).mul(1000);
+        // Rate = 1000 * (2-totalSupply/InitialSupply)^2
+        // This imposes a max possible supply of 2 billion
+        if (previousSupply >= 2 * initialSupply) {
+            return 0;
+        }
+        uint256 newTokens = _contributed.mul(1000).mul(bigInt(2)-(bigInt(previousSupply).div(initialSupply))).mul(bigInt(2)-(bigInt(previousSupply).div(initialSupply))).div(bigInt(1).mul(bigInt(1)));
         return newTokens;
+    }
+
+    function bigInt(uint256 input) internal pure returns (uint256) {
+      return input.mul(10 ** 10);
     }
 
     function currentWindow() public constant returns (uint) {
@@ -234,13 +238,13 @@ contract NectarController is TokenController, Whitelist {
     /// @dev topUpBalance - This is only used to increase this.balance in the case this controller is used to allow burning
     function topUpBalance() public payable {
         // Pledged fees could be sent here and used to payout users who burn their tokens
-        LogFeeTopUp(msg.value);
+        emit LogFeeTopUp(msg.value);
     }
 
     /// @dev evacuateToVault - This is only used to evacuate remaining to ether from this contract to the vault address
     function evacuateToVault() public onlyOwner{
-        vaultAddress.transfer(this.balance);
-        LogFeeEvacuation(this.balance);
+        vaultAddress.transfer(address(this).balance);
+        emit LogFeeEvacuation(address(this).balance);
     }
 
     /// @dev enableBurning - Allows the owner to activate burning on the underlying token contract
@@ -261,7 +265,7 @@ contract NectarController is TokenController, Whitelist {
         NEC token = NEC(_token);
         uint balance = token.balanceOf(this);
         token.transfer(owner, balance);
-        ClaimedTokens(_token, owner, balance);
+        emit ClaimedTokens(_token, owner, balance);
     }
 
 ////////////////
@@ -275,6 +279,5 @@ contract NectarController is TokenController, Whitelist {
     event LogClaim (address _user, uint _amount);
 
     event UpgradedController (address newAddress);
-
 
 }
