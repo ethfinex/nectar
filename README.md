@@ -12,7 +12,12 @@ A summary of the design choices and purpose of the Nectar token is available her
 
 13th February - [NEC deployed](https://etherscan.io/tx/0x4041cf804f1628c26905e1efce969e254e195b3a5ee8951a27f7039c1af5ab06) - commit fc5e6d575830ee48f0a54449e32d9dc5992f6997
 
-13th February - [Nectar Controller 1 deployed](https://etherscan.io/tx/0x840648dc7a64e0c259f278985b78ff475b6651f040ba2a4425e3515b350407ca) - commit fc5e6d575830ee48f0a54449e32d9dc5992f6997
+13th February - [Nectar Controller v1.0.0 deployed](https://etherscan.io/tx/0x840648dc7a64e0c259f278985b78ff475b6651f040ba2a4425e3515b350407ca) - commit fc5e6d575830ee48f0a54449e32d9dc5992f6997
+
+30th March - [Nectar Controller v2.0.0 deployed](https://etherscan.io/tx/0xe8b1fda901476b8e33aede88cb0690903e433147eeb32803f05f5cbedd2f5056) -
+commit latest
+
+12th April - [upgradeContoller used to switch control to v2.0.0](https://etherscan.io/tx/0xe91489b5f9eb78a96892b29dc568b418f930176f6cd13e886cd8470ac0f33b5b)
 
 
 ## Contracts summary

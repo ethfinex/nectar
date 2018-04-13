@@ -26,7 +26,6 @@ contract('NEC setup', function(accounts) {
   })
 
   it('should change the Controller to the Controller Contract', async function () {
-
     await nectar.changeController(controller.address, {from: accounts[0]})
     const controllerAddress = await nectar.controller.call()
     assert.equal(controllerAddress, controller.address, 'The controller was not correctly set')

@@ -50,7 +50,7 @@ contract('24 months', function(accounts) {
 // Possible monthly trade volume: 50 billion usd
 // Volume is 50 million eth
 // Assuming possible monthly fees contributable to be:
-// Makers: 25000 eth
+// Makers: 10000 eth
 // Takers: 50000 eth
 
   it('pledge eth to create tokens in month 1', async function () {
